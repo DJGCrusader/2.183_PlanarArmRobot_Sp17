@@ -93,9 +93,9 @@ int main(int argc, char *argv[])
             start = std::chrono::high_resolution_clock::now();
 
             //  Control
-            currentDesired[0]=rand()%500 - 250;
-            currentDesired[1]=rand()%500 - 250;
-            currentDesired[2]=rand()%500 - 250;
+            currentDesired[0]=rand()%750 - 250;
+            currentDesired[1]=rand()%750 - 250;
+            currentDesired[2]=rand()%750 - 250;
             motor.SetCurrentAll(currentDesired);
 
             //Quit when user presses 'q'
@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
     currentDesired[0]=0;
     currentDesired[1]=0;
     currentDesired[2]=0;
-    // motor.SetCurrentAll(currentDesired);
-    // motor.DisableAllDevice();
+    motor.SetCurrentAll(currentDesired);
+    motor.DisableAllDevice();
     return 0;
 }
