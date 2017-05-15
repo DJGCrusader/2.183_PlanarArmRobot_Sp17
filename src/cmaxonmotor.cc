@@ -8,13 +8,13 @@ using namespace std;
 
 CMaxonMotor::CMaxonMotor()
 {
-    PortName_M1 = "USB1";
-    PortName_M2 = "USB0";
-    PortName_M3 = "USB2";
+    PortName_M1 = "USB2";
+    PortName_M2 = "USB1";
+    //PortName_M3 = "USB0";
 
     nodeId_M1 = 1;
     nodeId_M2 = 2;
-    nodeId_M3 = 3;
+    //nodeId_M3 = 3;
 
     ErrorCode = 0x00;
 }
@@ -264,7 +264,7 @@ void* CMaxonMotor::activate_device(char *PortName, unsigned short nodeId)
     char ProtocolStackName[] = "MAXON SERIAL V2";
     char InterfaceName[] = "USB";
     unsigned int ErrorCode = 0x00;
-    unsigned long timeout_ = 500;
+    unsigned long timeout_ = 50;
     unsigned long baudrate_ = 1000000; //1000000;
     void *keyHandle_;
 
@@ -325,38 +325,56 @@ void* CMaxonMotor::activate_device(char *PortName, unsigned short nodeId)
 void CMaxonMotor::CloseAllDevice(){
 	closeDevice(keyHandle_M1);
 	closeDevice(keyHandle_M2);
-    closeDevice(keyHandle_M3);
+    // closeDevice(keyHandle_M3);
 }
 
 void CMaxonMotor::ActiviateAllDevice(){
     keyHandle_M1 = activate_device(PortName_M1, nodeId_M1);
     keyHandle_M2 = activate_device(PortName_M2, nodeId_M2);
-    keyHandle_M3 = activate_device(PortName_M3, nodeId_M3);
+    // keyHandle_M3 = activate_device(PortName_M3, nodeId_M3);
 }
 
 void CMaxonMotor::DisableAllDevice(){
     DisableDevice(keyHandle_M1, nodeId_M1);
     DisableDevice(keyHandle_M2, nodeId_M2);
-    DisableDevice(keyHandle_M3, nodeId_M3);
+    // DisableDevice(keyHandle_M3, nodeId_M3);
 }
 
-
-void CMaxonMotor::GetCurrentPosition(void *keyHandle_, int& CurrentPosition, unsigned short nodeId){
+void CMaxonMotor::GetCurrentVel(void *keyHandle_, int *CurrentVel, unsigned short nodeId){
     unsigned int errorCode = 0;
 
-    if( !VCS_GetPositionIs(keyHandle_, nodeId, &CurrentPosition, &errorCode) ){
+    if( !VCS_GetVelocityIs(keyHandle_, nodeId, CurrentVel, &errorCode) ){
+        cout << " error while getting current position , error code="<<errorCode<<endl;
+    }
+}
+
+void CMaxonMotor::GetCurrentVelAllDevice(int* CurrentVel){
+    int Vel = 0;
+    GetCurrentVel(keyHandle_M1, &Vel,nodeId_M1);
+    CurrentVel[0]=Vel;
+    GetCurrentVel(keyHandle_M2, &Vel,nodeId_M2);
+    CurrentVel[1]=Vel;
+
+    // GetCurrentPosition(keyHandle_M3, Pos,nodeId_M3);
+    // CurrentPosition[2]=Pos;
+}
+
+void CMaxonMotor::GetCurrentPosition(void *keyHandle_, int *CurrentPosition, unsigned short nodeId){
+    unsigned int errorCode = 0;
+
+    if( !VCS_GetPositionIs(keyHandle_, nodeId, CurrentPosition, &errorCode) ){
         cout << " error while getting current position , error code="<<errorCode<<endl;
     }
 }
 
 void CMaxonMotor::GetCurrentPositionAllDevice(int* CurrentPosition){
 	int Pos;
-	GetCurrentPosition(keyHandle_M1, Pos,nodeId_M1);
+	GetCurrentPosition(keyHandle_M1, &Pos,nodeId_M1);
 	CurrentPosition[0]=Pos;
-	GetCurrentPosition(keyHandle_M2, Pos,nodeId_M2);
+	GetCurrentPosition(keyHandle_M2, &Pos,nodeId_M2);
 	CurrentPosition[1]=Pos;
-    GetCurrentPosition(keyHandle_M3, Pos,nodeId_M3);
-    CurrentPosition[2]=Pos;
+    // GetCurrentPosition(keyHandle_M3, Pos,nodeId_M3);
+    // CurrentPosition[2]=Pos;
 }
 
 void CMaxonMotor::SetCurrentAll(short* targetCurrent){
@@ -375,11 +393,11 @@ void CMaxonMotor::SetCurrentAll(short* targetCurrent){
         lResult = 1;
         cerr << "VCS_SetCurrentMust Failed"<< endl;
     }
-    if(VCS_SetCurrentMust(keyHandle_M3, nodeId_M3,targetCurrent[2], &ErrorCode) == 0)
-    {
-        lResult = 1;
-        cerr << "VCS_SetCurrentMust Failed"<< endl;
-    }
+    // if(VCS_SetCurrentMust(keyHandle_M3, nodeId_M3,targetCurrent[2], &ErrorCode) == 0)
+    // {
+    //     lResult = 1;
+    //     cerr << "VCS_SetCurrentMust Failed"<< endl;
+    // }
 }
 
 void CMaxonMotor::GetCurrentAll(short* currentAll){
@@ -399,12 +417,12 @@ void CMaxonMotor::GetCurrentAll(short* currentAll){
         cerr << "VCS_SetCurrentMust Failed"<< endl;
     }
     currentAll[1]=current;
-    if(VCS_GetCurrentMust(keyHandle_M3, nodeId_M3, &current, &ErrorCode) == 0)
-    {
-        lResult = 1;
-        cerr << "VCS_SetCurrentMust Failed"<< endl;
-    }
-    currentAll[2]=current;
+    // if(VCS_GetCurrentMust(keyHandle_M3, nodeId_M3, &current, &ErrorCode) == 0)
+    // {
+    //     lResult = 1;
+    //     cerr << "VCS_SetCurrentMust Failed"<< endl;
+    // }
+    // currentAll[2]=current;
 }
 
 void CMaxonMotor::SetCurrentModeAll(){
@@ -420,15 +438,15 @@ void CMaxonMotor::SetCurrentModeAll(){
         cerr << "VCS_ActivateCurrentMode Failed"<< endl;
         lResult = 1;
     }
-    if(VCS_ActivateCurrentMode(keyHandle_M3, nodeId_M3, &ErrorCode) == 0)
-    {
-        cerr << "VCS_ActivateCurrentMode Failed"<< endl;
-        lResult = 1;
-    }
+    // if(VCS_ActivateCurrentMode(keyHandle_M3, nodeId_M3, &ErrorCode) == 0)
+    // {
+    //     cerr << "VCS_ActivateCurrentMode Failed"<< endl;
+    //     lResult = 1;
+    // }
 }
 
 void CMaxonMotor::MoveAllDevice(const long* TargetPosition){
 	Move(keyHandle_M1, TargetPosition[0], nodeId_M1);
-	Move(keyHandle_M2, TargetPosition[0], nodeId_M2);
-    Move(keyHandle_M3, TargetPosition[0], nodeId_M3);
+	Move(keyHandle_M2, TargetPosition[1], nodeId_M2);
+    //Move(keyHandle_M3, TargetPosition[0], nodeId_M3);
 }

@@ -27,7 +27,8 @@ private:
 
     void closeDevice(void *keyHandle_);
     void Move(void *keyHandle_, long TargetPosition, unsigned short nodeId);
-    void GetCurrentPosition(void *keyHandle_, int& CurrentPosition, unsigned short nodeId);
+    void GetCurrentPosition(void *keyHandle_, int *CurrentPosition, unsigned short nodeId);
+    void GetCurrentVel(void *keyHandle_, int *CurrentVel, unsigned short nodeId);
 
     void Halt(void *keyHandle_, unsigned short nodeId);
 
@@ -37,6 +38,7 @@ public:
     void CloseAllDevice();
     void ActiviateAllDevice();
     void DisableAllDevice();
+    void GetCurrentVelAllDevice(int* CurrentVel);
     void GetCurrentPositionAllDevice(int* CurrentPosition);
     void SetCurrentAll(short* targetCurrent);
     void GetCurrentAll(short* currentAll);
