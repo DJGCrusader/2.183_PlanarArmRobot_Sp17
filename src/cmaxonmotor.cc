@@ -3,13 +3,15 @@
 #include <iostream>
 #include <stdlib.h>
 
+#define ENC2RAD (3.1415926/72.0)
+
 using namespace std;
 
 
 CMaxonMotor::CMaxonMotor()
 {
-    PortName_M1 = "USB2";
-    PortName_M2 = "USB1";
+    PortName_M1 = (char *)"USB0";
+    PortName_M2 = (char *)"USB1";
     //PortName_M3 = "USB0";
 
     nodeId_M1 = 1;
@@ -343,18 +345,18 @@ void CMaxonMotor::DisableAllDevice(){
 void CMaxonMotor::GetCurrentVel(void *keyHandle_, int *CurrentVel, unsigned short nodeId){
     unsigned int errorCode = 0;
 
-    if( !VCS_GetVelocityIs(keyHandle_, nodeId, CurrentVel, &errorCode) ){
+    if( !VCS_GetVelocityIsAveraged(keyHandle_, nodeId, CurrentVel, &errorCode) ){
         cout << " error while getting current position , error code="<<errorCode<<endl;
     }
 }
 
-void CMaxonMotor::GetCurrentVelAllDevice(int* CurrentVel){
+void CMaxonMotor::GetCurrentVelAllDevice(double* CurrentVel){
     int Vel = 0;
     GetCurrentVel(keyHandle_M1, &Vel,nodeId_M1);
-    CurrentVel[0]=Vel;
+    cout << Vel << endl;
+    CurrentVel[0]=ENC2RAD*Vel;
     GetCurrentVel(keyHandle_M2, &Vel,nodeId_M2);
-    CurrentVel[1]=Vel;
-
+    CurrentVel[1]=ENC2RAD*Vel;
     // GetCurrentPosition(keyHandle_M3, Pos,nodeId_M3);
     // CurrentPosition[2]=Pos;
 }
@@ -367,12 +369,12 @@ void CMaxonMotor::GetCurrentPosition(void *keyHandle_, int *CurrentPosition, uns
     }
 }
 
-void CMaxonMotor::GetCurrentPositionAllDevice(int* CurrentPosition){
+void CMaxonMotor::GetCurrentPositionAllDevice(double* CurrentPosition){
 	int Pos;
 	GetCurrentPosition(keyHandle_M1, &Pos,nodeId_M1);
-	CurrentPosition[0]=Pos;
+	CurrentPosition[0]=ENC2RAD*Pos;
 	GetCurrentPosition(keyHandle_M2, &Pos,nodeId_M2);
-	CurrentPosition[1]=Pos;
+	CurrentPosition[1]=ENC2RAD*Pos;
     // GetCurrentPosition(keyHandle_M3, Pos,nodeId_M3);
     // CurrentPosition[2]=Pos;
 }
@@ -405,19 +407,19 @@ void CMaxonMotor::GetCurrentAll(short* currentAll){
     short int current;
     int lResult = 0;
     unsigned int ErrorCode = 0;
-    if(VCS_GetCurrentMust(keyHandle_M1, nodeId_M1, &current, &ErrorCode) == 0)
+    if(VCS_GetCurrentIsAveraged(keyHandle_M1, nodeId_M1, &current, &ErrorCode) == 0)
     {
         lResult = 1;
         cerr << "VCS_SetCurrentMust Failed"<< endl;
     }
     currentAll[0]=current;
-    if(VCS_GetCurrentMust(keyHandle_M2, nodeId_M2, &current, &ErrorCode) == 0)
+    if(VCS_GetCurrentIsAveraged(keyHandle_M2, nodeId_M2, &current, &ErrorCode) == 0)
     {
         lResult = 1;
         cerr << "VCS_SetCurrentMust Failed"<< endl;
     }
     currentAll[1]=current;
-    // if(VCS_GetCurrentMust(keyHandle_M3, nodeId_M3, &current, &ErrorCode) == 0)
+    // if(VCS_GetCurrentIsAveraged(keyHandle_M3, nodeId_M3, &current, &ErrorCode) == 0)
     // {
     //     lResult = 1;
     //     cerr << "VCS_SetCurrentMust Failed"<< endl;
