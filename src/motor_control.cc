@@ -5,6 +5,7 @@
 #include <chrono>
 #include <termios.h>
 #include <fstream>  //THIS IS TO WRITE FILE
+#include <cmath>
 
 #define NB_ENABLE 0
 #define NB_DISABLE 1
@@ -22,6 +23,8 @@ double KJOINT[3];
 double BJOINT[3];
 double KPOS[3];
 double KVEL[3];
+double STARTPOINT[2];
+double ENDPOINT[2];
 
 
 using namespace std;
@@ -66,7 +69,7 @@ int kbhit()
 }
 
 double* randomTest(){
-    double torqueDesired[3];
+    static double torqueDesired[3];
     torqueDesired[0]=0; //rand()%400;//test: apply random currents
     torqueDesired[1]=0; //rand()%400; //UNITS: milliNewton-Meters
     torqueDesired[2]=rand()%400 - 200;
@@ -75,7 +78,7 @@ double* randomTest(){
 }
 
 double* ReflexFeedback(int* thetaDesired, int* omegaDesired, int* thetaCurrent, int* omegaCurrent){    
-    double thetaEP[3];
+    static double thetaEP[3];
     // ThetaCurrentPrev=thetaCurrent;
     // OmegaCurrentPrev=omegaCurrent;
     
@@ -86,7 +89,7 @@ double* ReflexFeedback(int* thetaDesired, int* omegaDesired, int* thetaCurrent, 
 }
 
 double* EPModel(int* thetaDesired, int* omegaDesired, int* thetaCurrent, int* omegaCurrent){
-    double torqueDesired [3];
+    static double torqueDesired [3];
     double* thetaEP;
     thetaEP = ReflexFeedback(thetaDesired, omegaDesired, thetaCurrent, omegaCurrent);
     torqueDesired[0]=-1*(( thetaEP[0]-thetaCurrent[0])*KJOINT[0]  - (omegaCurrent[0]*BJOINT[0]));
@@ -94,6 +97,31 @@ double* EPModel(int* thetaDesired, int* omegaDesired, int* thetaCurrent, int* om
     torqueDesired[2]=( thetaEP[2]-thetaCurrent[2])*KJOINT[2]  - (omegaCurrent[2]*BJOINT[2]);
     return torqueDesired;
 }
+
+
+double* minJerkTrajectory(double time, double duration){
+    
+    static double minimumjerktrajectory_theta_omega[4];
+    
+    if(time> duration){
+        double* endPos = minJerkTrajectory(duration, duration); //end of movement position and velocity
+        minimumjerktrajectory_theta_omega[0]= endPos[0]; 
+        minimumjerktrajectory_theta_omega[1]= endPos[1]; 
+
+        minimumjerktrajectory_theta_omega[2]=  0;
+        minimumjerktrajectory_theta_omega[3]=  0;
+    }
+    else {
+        minimumjerktrajectory_theta_omega[0]= STARTPOINT[0] + (ENDPOINT[0]-STARTPOINT[0])*(10*pow((time/duration), 3) - 15*pow((time/duration), 4) + 6*pow((time/duration),5)); 
+        minimumjerktrajectory_theta_omega[1]= STARTPOINT[1] + (ENDPOINT[1]-STARTPOINT[1])*(10*pow((time/duration), 3) - 15*pow((time/duration), 4) + 6*pow((time/duration),5)); 
+
+        minimumjerktrajectory_theta_omega[2]=  (ENDPOINT[0]-STARTPOINT[0])*(1/duration)*(30*pow((time/duration), 2) - 60*pow((time/duration), 3) + 30*pow((time/duration), 4)); 
+        minimumjerktrajectory_theta_omega[3]=  (ENDPOINT[1]-STARTPOINT[1])*(1/duration)*(30*pow((time/duration), 2) - 60*pow((time/duration), 3) + 30*pow((time/duration), 4)); 
+
+    }
+    return minimumjerktrajectory_theta_omega;
+}
+
 
 
 int main(int argc, char *argv[])
@@ -122,6 +150,29 @@ int main(int argc, char *argv[])
     KJOINT[1] = 8; //4;
     KJOINT[2] = 8; //4;
 
+    //target positions in meters
+    //double target_x[4];
+    //double target_y[4];
+    double target_x[4] = {0, 0, -0.140, 0.325};
+    double target_y[4] = {0.273, 0.584, 0.522, 0.273};
+    //arm lengths in meters
+    double l1 = 0.279;
+    double l2 = 0.257;
+    int start = 0;         //index of start target, 0 - 3
+    int end = 1;           //index of end target, 0 -3
+    double movement_duration = 5;      //duration in seconds
+
+    double alpha1_start = atan(target_y[start]/target_x[start]);
+    double alpha2_start = acos((pow(target_x[start], 2)+ pow(target_y[start], 2)+pow(l1, 2)-pow(l2, 2))/(2*l1*sqrt(pow(target_x[start], 2)+pow(target_y[start], 2))));
+    double alpha3_start = acos((pow(target_x[start], 2)+ pow(target_y[start], 2)+pow(l2, 2)-pow(l1, 2))/(2*l2*sqrt(pow(target_x[start], 2)+pow(target_y[start], 2))));
+    double alpha1_end = atan(target_y[end]/target_x[end]);
+    double alpha2_end = acos((pow(target_x[end], 2)+ pow(target_y[end], 2)+pow(l1, 2)-pow(l2, 2))/(2*l1*sqrt(pow(target_x[end], 2)+pow(target_y[end], 2))));
+    double alpha3_end = acos((pow(target_x[end], 2)+ pow(target_y[end], 2)+pow(l2, 2)-pow(l1, 2))/(2*l2*sqrt(pow(target_x[end], 2)+pow(target_y[end], 2))));
+
+    STARTPOINT[0]=alpha1_start - alpha2_start; //theta1 and theta2 of start target
+    STARTPOINT[1]=alpha1_start+alpha3_start;
+    ENDPOINT[0]=alpha1_end - alpha2_end; //theta1 and theta2 of end target
+    ENDPOINT[1]= alpha1_end + alpha3_end;
     sleep(1);
     cout << "Press <Enter> to begin..." << endl;
     getchar();
@@ -132,6 +183,7 @@ int main(int argc, char *argv[])
     motor.CloseAllDevice();
     motor.ActiviateAllDevice();
     motor.SetCurrentModeAll();
+    double* minJerk_theta_omega;
 
     int thetaCurrent[3];
     int omegaCurrent[3];
@@ -159,21 +211,22 @@ int main(int argc, char *argv[])
     std::chrono::time_point<std::chrono::high_resolution_clock>
                         totalStart = std::chrono::high_resolution_clock::now();
     std::chrono::time_point<std::chrono::high_resolution_clock>
-                        start = std::chrono::high_resolution_clock::now();
+                        startT = std::chrono::high_resolution_clock::now();
     std::chrono::time_point<std::chrono::high_resolution_clock>
-                        finish = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = finish - start;
-    std::chrono::duration<double> totalElapsed = finish - totalStart;
+                        finishT = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = finishT - startT;
+    std::chrono::duration<double> totalElapsed = finishT - totalStart;
     double over = 0;
+
 
     cout << "Running. Press <q> to Quit!" << endl;
 
     ///////////////////////////////////////////////////////////////////////////////////////// MAIN LOOP
     while(running){
         //  Timing to kep a certain frequency
-        finish = std::chrono::high_resolution_clock::now();
-        elapsed = finish - start;
-        totalElapsed = finish - totalStart;
+        finishT = std::chrono::high_resolution_clock::now();
+        elapsed = finishT - startT;
+        totalElapsed = finishT - totalStart;
 
         if(elapsed.count() >= CTRLPERIOD){
 
@@ -182,15 +235,16 @@ int main(int argc, char *argv[])
                 cout<<"SLOW! Loop took "<< over << " seconds" << endl;
             }
             //  For timing
-            start = std::chrono::high_resolution_clock::now();
+            startT = std::chrono::high_resolution_clock::now();
             
             // Update Desired
-            // thetaDesired[0] = 0; //minjerk(time);
-            // thetaDesired[1] = 0;
-            // thetaDesired[2] = 0; 
-            // omegaDesired[0] = 0; //minjerk(time);            
-            // omegaDesired[1] = 0;
-            // omegaDesired[2] = 0;
+            minJerk_theta_omega = minJerkTrajectory(elapsed.count(), movement_duration);
+            thetaDesired[0] = minJerk_theta_omega[0];; //minjerk(time);
+            thetaDesired[1] = minJerk_theta_omega[1];
+            thetaDesired[2] = 0;
+            omegaDesired[0] = minJerk_theta_omega[2]; //minjerk(time);            
+            omegaDesired[1] = minJerk_theta_omega[3];
+            omegaDesired[2] = 0;
 
 
             // Sensing
