@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <chrono>
 #include <termios.h>
+#include <fstream>  //THIS IS TO WRITE FILE
 
 #define NB_ENABLE 0
 #define NB_DISABLE 1
@@ -97,6 +98,11 @@ double* EPModel(int* thetaDesired, int* omegaDesired, int* thetaCurrent, int* om
 
 int main(int argc, char *argv[])
 {
+    //Set up data logging
+    ofstream myfile;
+    myfile.open ("results.txt");
+    myfile << "time thetaCurrent1 thetaDesired1 omegaCurrent1 omegaDesired1 thetaCurrent2 thetaDesired2 omegaCurrent2 omegaDesired2\n\n";
+
     char inChar;
     int inCheck=0;
     bool running = 1;
@@ -151,10 +157,13 @@ int main(int argc, char *argv[])
 
     //  Record start time
     std::chrono::time_point<std::chrono::high_resolution_clock>
+                        totalStart = std::chrono::high_resolution_clock::now();
+    std::chrono::time_point<std::chrono::high_resolution_clock>
                         start = std::chrono::high_resolution_clock::now();
     std::chrono::time_point<std::chrono::high_resolution_clock>
                         finish = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = finish - start;
+    std::chrono::duration<double> totalElapsed = finish - totalStart;
     double over = 0;
 
     cout << "Running. Press <q> to Quit!" << endl;
@@ -164,6 +173,7 @@ int main(int argc, char *argv[])
         //  Timing to kep a certain frequency
         finish = std::chrono::high_resolution_clock::now();
         elapsed = finish - start;
+        totalElapsed = finish - totalStart;
 
         if(elapsed.count() >= CTRLPERIOD){
 
@@ -198,6 +208,12 @@ int main(int argc, char *argv[])
             currentDesired[2] = KV2*torqueDesired[2];
             motor.SetCurrentAll(currentDesired);
 
+            //  Logging 
+            myfile << totalElapsed.count() << " " << thetaCurrent[0] << " " << thetaDesired[0] << " "
+                                                << omegaCurrent[0] << " " << omegaDesired[0] << " "
+                                                << thetaCurrent[1] << " " << thetaDesired[1] << " "
+                                                << omegaCurrent[1] << " " << omegaDesired[1] << "\n";
+
             //Quit when user presses 'q'
             inCheck=kbhit();
             if (inCheck!=0)
@@ -219,6 +235,7 @@ int main(int argc, char *argv[])
     //////////////////////////////////////////////////////////////////////////////////////////// MAIN LOOP END
 
 
+    myfile.close();
     currentDesired[0]=0;
     currentDesired[1]=0;
     currentDesired[2]=0;
