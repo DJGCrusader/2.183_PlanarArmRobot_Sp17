@@ -3,7 +3,8 @@
 #include <iostream>
 #include <stdlib.h>
 
-#define ENC2RAD (3.1415926/72.0)
+#define PI 3.1415926
+#define ENC2RAD (2*PI/72.0)
 
 using namespace std;
 
@@ -15,7 +16,7 @@ CMaxonMotor::CMaxonMotor()
     //PortName_M3 = "USB0";
 
     nodeId_M1 = 1;
-    nodeId_M2 = 2;
+    nodeId_M2 = 3;
     //nodeId_M3 = 3;
 
     ErrorCode = 0x00;
@@ -353,10 +354,9 @@ void CMaxonMotor::GetCurrentVel(void *keyHandle_, int *CurrentVel, unsigned shor
 void CMaxonMotor::GetCurrentVelAllDevice(double* CurrentVel){
     int Vel = 0;
     GetCurrentVel(keyHandle_M1, &Vel,nodeId_M1);
-    cout << Vel << endl;
-    CurrentVel[0]=ENC2RAD*Vel;
+    CurrentVel[0]=-ENC2RAD*Vel;
     GetCurrentVel(keyHandle_M2, &Vel,nodeId_M2);
-    CurrentVel[1]=ENC2RAD*Vel;
+    CurrentVel[1]=-ENC2RAD*Vel;
     // GetCurrentPosition(keyHandle_M3, Pos,nodeId_M3);
     // CurrentPosition[2]=Pos;
 }
@@ -372,9 +372,9 @@ void CMaxonMotor::GetCurrentPosition(void *keyHandle_, int *CurrentPosition, uns
 void CMaxonMotor::GetCurrentPositionAllDevice(double* CurrentPosition){
 	int Pos;
 	GetCurrentPosition(keyHandle_M1, &Pos,nodeId_M1);
-	CurrentPosition[0]=ENC2RAD*Pos;
+	CurrentPosition[0]=-ENC2RAD*Pos;
 	GetCurrentPosition(keyHandle_M2, &Pos,nodeId_M2);
-	CurrentPosition[1]=ENC2RAD*Pos;
+	CurrentPosition[1]=-ENC2RAD*Pos;
     // GetCurrentPosition(keyHandle_M3, Pos,nodeId_M3);
     // CurrentPosition[2]=Pos;
 }
@@ -383,17 +383,21 @@ void CMaxonMotor::SetCurrentAll(short* targetCurrent){
 
     int lResult = 0;
     unsigned int ErrorCode = 0;
+    if (targetCurrent[0] > 4500) targetCurrent[0] = 4500;
+    if (targetCurrent[0] < -4500) targetCurrent[0] = -4500;
+    if (targetCurrent[1] > 4500) targetCurrent[0] = 4500;
+    if (targetCurrent[1] < -4500) targetCurrent[0] = -4500;
 
     //cout<< targetCurrent << endl;
     if(VCS_SetCurrentMust(keyHandle_M1, nodeId_M1,targetCurrent[0], &ErrorCode) == 0)
     {
         lResult = 1;
-        cerr << "VCS_SetCurrentMust Failed"<< endl;
+        cerr << "VCS_SetCurrentMust Failed M1: "<< targetCurrent[0] << " " << ErrorCode << endl;
     }
     if(VCS_SetCurrentMust(keyHandle_M2, nodeId_M2,targetCurrent[1], &ErrorCode) == 0)
     {
         lResult = 1;
-        cerr << "VCS_SetCurrentMust Failed"<< endl;
+        cerr << "VCS_SetCurrentMust Failed M2: "<< targetCurrent[0] << endl;
     }
     // if(VCS_SetCurrentMust(keyHandle_M3, nodeId_M3,targetCurrent[2], &ErrorCode) == 0)
     // {
@@ -410,13 +414,13 @@ void CMaxonMotor::GetCurrentAll(short* currentAll){
     if(VCS_GetCurrentIsAveraged(keyHandle_M1, nodeId_M1, &current, &ErrorCode) == 0)
     {
         lResult = 1;
-        cerr << "VCS_SetCurrentMust Failed"<< endl;
+        cerr << "VCS_GetCurrentMust Failed M1"<< endl;
     }
     currentAll[0]=current;
     if(VCS_GetCurrentIsAveraged(keyHandle_M2, nodeId_M2, &current, &ErrorCode) == 0)
     {
         lResult = 1;
-        cerr << "VCS_SetCurrentMust Failed"<< endl;
+        cerr << "VCS_GetCurrentMust Failed M2"<< endl;
     }
     currentAll[1]=current;
     // if(VCS_GetCurrentIsAveraged(keyHandle_M3, nodeId_M3, &current, &ErrorCode) == 0)
@@ -432,12 +436,12 @@ void CMaxonMotor::SetCurrentModeAll(){
     unsigned int ErrorCode = 0;
     if(VCS_ActivateCurrentMode(keyHandle_M1, nodeId_M1, &ErrorCode) == 0)
     {
-        cerr << "VCS_ActivateCurrentMode Failed"<< endl;
+        cerr << "VCS_ActivateCurrentMode Failed M1"<< endl;
         lResult = 1;
     }
     if(VCS_ActivateCurrentMode(keyHandle_M2, nodeId_M2, &ErrorCode) == 0)
     {
-        cerr << "VCS_ActivateCurrentMode Failed"<< endl;
+        cerr << "VCS_ActivateCurrentMode Failed M2"<< endl;
         lResult = 1;
     }
     // if(VCS_ActivateCurrentMode(keyHandle_M3, nodeId_M3, &ErrorCode) == 0)
