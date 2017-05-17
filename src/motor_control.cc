@@ -6,18 +6,21 @@
 #include <termios.h>
 #include <fstream>  //THIS IS TO WRITE FILE
 #include <cmath>
+#include <queue>
 
 #define NB_ENABLE 0
 #define NB_DISABLE 1
-#define CTRLFREQ 10.0
-#define CTRLPERIOD 1.0/CTRLFREQ
-#define LATEPERIOD CTRLPERIOD/4.0
+#define CTRLFREQ 38.0
+#define CTRLPERIOD (1.0/CTRLFREQ)
+#define LATEPERIOD (CTRLPERIOD/2.0)
 #define KT0 217.0 //milliNewton-meter per Amp
-#define KT1 217.0
+#define KT1 70.5
 #define KT2 70.5
 #define KV0 4.608 //mA per milliNewton-Meter
-#define KV1 4.608
+#define KV1 14.180
 #define KV2 14.180
+#define PI 3.1415926
+#define ENC2RAD (2*PI/72.0)
 
 double KJOINT[3];
 double BJOINT[3];
@@ -27,10 +30,10 @@ double STARTPOINT[2];
 double ENDPOINT[2];
 double L1;
 double L2;
-
+double delayVel;
+double delayPos;
 
 using namespace std;
-
 
 //Helper Function to read user input while still running loop, for quitting
 void nonblock(int state)
@@ -75,11 +78,10 @@ double* randomTest(){
     torqueDesired[0]=0; //rand()%400;//test: apply random currents
     torqueDesired[1]=0; //rand()%400; //UNITS: milliNewton-Meters
     torqueDesired[2]=rand()%400 - 200;
-
     return torqueDesired;
 }
 
-double* ReflexFeedback(int* thetaDesired, int* omegaDesired, int* thetaCurrent, int* omegaCurrent){    
+double* ReflexFeedback(double* thetaDesired, double* omegaDesired, double* thetaCurrent, double* omegaCurrent){    
     static double thetaEP[3];
     // ThetaCurrentPrev=thetaCurrent;
     // OmegaCurrentPrev=omegaCurrent;
@@ -90,12 +92,12 @@ double* ReflexFeedback(int* thetaDesired, int* omegaDesired, int* thetaCurrent, 
     return thetaEP;
 }
 
-double* EPModel(int* thetaDesired, int* omegaDesired, int* thetaCurrent, int* omegaCurrent){
+double* EPModel(double* thetaDesired, double* omegaDesired, double* thetaCurrent, double* omegaCurrent, double* thetaDelayed, double* omegaDelayed){
     static double torqueDesired [3];
-    double* thetaEP;
-    thetaEP = ReflexFeedback(thetaDesired, omegaDesired, thetaCurrent, omegaCurrent);
-    torqueDesired[0]=-1*(( thetaEP[0]-thetaCurrent[0])*KJOINT[0]  - (omegaCurrent[0]*BJOINT[0]));
-    torqueDesired[1]=-1*(( thetaEP[1]-thetaCurrent[1])*KJOINT[1]  - (omegaCurrent[1]*BJOINT[1]));
+    static double* thetaEP;
+    thetaEP = ReflexFeedback(thetaDesired, omegaDesired, thetaDelayed, omegaDelayed);
+    torqueDesired[0]=(( thetaEP[0]-thetaCurrent[0])*KJOINT[0]  - (omegaCurrent[0]*BJOINT[0])) + (( thetaEP[1]-thetaCurrent[1])*KJOINT[2]  - (omegaCurrent[1]*BJOINT[2]));
+    torqueDesired[1]=(( thetaEP[1]-thetaCurrent[1])*KJOINT[1]  - (omegaCurrent[1]*BJOINT[1])) + (( thetaEP[0]-thetaCurrent[0])*KJOINT[2]  - (omegaCurrent[0]*BJOINT[2]));
     torqueDesired[2]=( thetaEP[2]-thetaCurrent[2])*KJOINT[2]  - (omegaCurrent[2]*BJOINT[2]);
     return torqueDesired;
 }
@@ -118,26 +120,23 @@ double* handPosToAngles(double x, double y){
     return thetas;
 }
 
-
-double* minJerkTrajectory(double time, double duration){
-    
+double* minJerkTrajectory(double tt, double duration){
     static double minimumJerkTrajectory_theta_omega[4]; // th1 th2 position, th1 th2 velocity
     double minimumJerkTrajectory_x_v[4]; //x, y position, x, y velocity 
     
-    if(time> duration){
+    if(tt> duration){
         double* endPos_theta_omega = minJerkTrajectory(duration, duration); //end of movement position and velocity   
         minimumJerkTrajectory_theta_omega[0]= endPos_theta_omega[0]; 
         minimumJerkTrajectory_theta_omega[1]= endPos_theta_omega[1]; 
-
         minimumJerkTrajectory_theta_omega[2]=  0;
         minimumJerkTrajectory_theta_omega[3]=  0;
     }
     else {
-        minimumJerkTrajectory_x_v[0]= STARTPOINT[0] + (ENDPOINT[0]-STARTPOINT[0])*(10*pow((time/duration), 3) - 15*pow((time/duration), 4) + 6*pow((time/duration),5)); 
-        minimumJerkTrajectory_x_v[1]= STARTPOINT[1] + (ENDPOINT[1]-STARTPOINT[1])*(10*pow((time/duration), 3) - 15*pow((time/duration), 4) + 6*pow((time/duration),5)); 
+        minimumJerkTrajectory_x_v[0]= STARTPOINT[0] + (ENDPOINT[0]-STARTPOINT[0])*(10*pow((tt/duration), 3) - 15*pow((tt/duration), 4) + 6*pow((tt/duration),5)); 
+        minimumJerkTrajectory_x_v[1]= STARTPOINT[1] + (ENDPOINT[1]-STARTPOINT[1])*(10*pow((tt/duration), 3) - 15*pow((tt/duration), 4) + 6*pow((tt/duration),5)); 
 
-        minimumJerkTrajectory_x_v[2]=  (ENDPOINT[0]-STARTPOINT[0])*(1/duration)*(30*pow((time/duration), 2) - 60*pow((time/duration), 3) + 30*pow((time/duration), 4)); 
-        minimumJerkTrajectory_x_v[3]=  (ENDPOINT[1]-STARTPOINT[1])*(1/duration)*(30*pow((time/duration), 2) - 60*pow((time/duration), 3) + 30*pow((time/duration), 4)); 
+        minimumJerkTrajectory_x_v[2]=  (ENDPOINT[0]-STARTPOINT[0])*(1/duration)*(30*pow((tt/duration), 2) - 60*pow((tt/duration), 3) + 30*pow((tt/duration), 4)); 
+        minimumJerkTrajectory_x_v[3]=  (ENDPOINT[1]-STARTPOINT[1])*(1/duration)*(30*pow((tt/duration), 2) - 60*pow((tt/duration), 3) + 30*pow((tt/duration), 4)); 
         double* endPos;
         endPos = handPosToAngles(minimumJerkTrajectory_x_v[0], minimumJerkTrajectory_x_v[1]);
         minimumJerkTrajectory_theta_omega[0]= endPos[0]; 
@@ -150,39 +149,38 @@ double* minJerkTrajectory(double time, double duration){
     return minimumJerkTrajectory_theta_omega;
 }
 
-
-
 int main(int argc, char *argv[])
 {
-    //Set up data logging
-    ofstream myfile;
-    myfile.open ("results.txt");
-    myfile << "time thetaCurrent1 thetaDesired1 omegaCurrent1 omegaDesired1 thetaCurrent2 thetaDesired2 omegaCurrent2 omegaDesired2\n\n";
-
     char inChar;
     int inCheck=0;
+
     bool running = 1;
 
+    // ------------------------------------------------------------------------------Definitions
+    delayVel = 0.040;
+    delayPos = 0.065; //artificially increased by an order of magnitude
+
     //Reflex Params
-    KVEL[0] = 0.3; //Ranges 0.3 to 0.6, Vel delay 40ms for 0.3, 26ms for 0.6. 
-    KVEL[1] = 0.3;
-    KVEL[2] = 0.3;
-    KPOS[0] = 2.4; //1.4; //Ranges from 1.4 to 2.5, Pos delay 65ms
-    KPOS[1] = 1.4; //1.4;
+    KVEL[0] = .2*0.3; //Ranges 0.3 to 0.6, Vel delay 40ms for 0.3, 26ms for 0.6. 
+    KVEL[1] = .2*0.3;
+    KVEL[2] = .2*0.3;
+    KPOS[0] = .2*1.4; //1.4; //Ranges from 1.4 to 2.5, Pos delay 65ms
+    KPOS[1] = .2*1.4; //1.4;
     KPOS[2] = 1.4; //1.4;
 
-    BJOINT[0] = 0.89; // N*m per rad per sec, 0.707 zeta
-    BJOINT[1] = 0.89;
-    BJOINT[2] = 0.89;
-    KJOINT[0] = 16; //4; //N*m per rad, slow. 64 for fast movements
-    KJOINT[1] = 8; //4;
-    KJOINT[2] = 8; //4;
+
+    KJOINT[0] = 1000*1.6; //4; //N*m per rad, slow. 64 for fast movements
+    KJOINT[1] = 1000*.8; //4;
+    KJOINT[2] = 1000*.8; //4;
+    BJOINT[0] = 1400*KJOINT[0];//1000*3.75; ////.89; //0.89; // N*m per rad per sec, 0.707 zeta
+    BJOINT[1] = 1400*KJOINT[1];//1000*1.764; //0.89;
+    BJOINT[2] = 1400*KJOINT[2];//1000*0.48; ////0.89;
 
     //target positions in meters
     //double target_x[4];
     //double target_y[4];
     double target_x[4] = {0, 0, -0.140, 0.325};
-    double target_y[4] = {0.273, 0.584, 0.522, 0.273};
+    double target_y[4] = {0.273, 0.5, 0.55, 0.273}; //0.584
     //arm lengths in meters
     L1 = 0.279;
     L2 = 0.257;
@@ -199,50 +197,73 @@ int main(int argc, char *argv[])
     ENDPOINT[0]= target_x[end]; //x and y of end target
     ENDPOINT[1]= target_y[end];
 
-    //double alpha1_start = atan(target_y[start]/target_x[start]);
-    //double alpha2_start = acos((pow(target_x[start], 2)+ pow(target_y[start], 2)+pow(l1, 2)-pow(l2, 2))/(2*l1*sqrt(pow(target_x[start], 2)+pow(target_y[start], 2))));
-    //double alpha3_start = acos((pow(target_x[start], 2)+ pow(target_y[start], 2)+pow(l2, 2)-pow(l1, 2))/(2*l2*sqrt(pow(target_x[start], 2)+pow(target_y[start], 2))));
-    //double alpha1_end = atan(target_y[end]/target_x[end]);
-    //double alpha2_end = acos((pow(target_x[end], 2)+ pow(target_y[end], 2)+pow(l1, 2)-pow(l2, 2))/(2*l1*sqrt(pow(target_x[end], 2)+pow(target_y[end], 2))));
-    //double alpha3_end = acos((pow(target_x[end], 2)+ pow(target_y[end], 2)+pow(l2, 2)-pow(l1, 2))/(2*l2*sqrt(pow(target_x[end], 2)+pow(target_y[end], 2))));
-
-    //STARTPOINT[0]=alpha1_start - alpha2_start; //theta1 and theta2 of start target
-    //STARTPOINT[1]=alpha1_start+alpha3_start;
-    //ENDPOINT[0]=alpha1_end - alpha2_end; //theta1 and theta2 of end target
-    //ENDPOINT[1]= alpha1_end + alpha3_end;
     sleep(1);
     cout << "Press <Enter> to begin..." << endl;
     getchar();
     nonblock(NB_ENABLE);
+
+    double* minJerk_theta_omega;
+
+    double thetaCurrent[3];
+    double thetaDelayed[3];
+    queue <double> qThetaDelayed0;
+    queue <double> qThetaDelayed1;
+    int thetaDelayNum = int(delayPos/CTRLPERIOD+0.5);
+
+    double omegaCurrent[3];
+    double omegaDelayed[3];
+    queue <int> qOmegaDelayed0;
+    queue <int> qOmegaDelayed1;
+    int omegaDelayNum = int(delayVel/CTRLPERIOD+0.5);
+
+    short currentCurrent[3];
+    double* torqueDesired;
+    
+    double thetaDesired[3];
+    thetaDesired[0] = PI/4.0; //17*ENC2RAD; //minjerk(time);
+    thetaDesired[1] = PI/4.0; //-21*ENC2RAD;
+    thetaDesired[2] = 0;
+
+    double omegaDesired[3];
+    omegaDesired[0] = 0; //minjerk(time);
+    omegaDesired[1] = 0;
+    omegaDesired[2] = 0;
+   
+    short currentDesired[3];
+    currentDesired[0]=0;
+    currentDesired[1]=0;
+    currentDesired[2]=0;
+
+    // ------------------------------------------------------------------------------Setup
+    sleep(1);
+    cout << "Press <Enter> to begin..." << endl;
+    getchar();
+    nonblock(NB_ENABLE);
+
+    //Set up data logging
+    ofstream myfile;
+    myfile.open ("results.txt");
+    myfile << "time thetaCurrent1 thetaDesired1 omegaCurrent1 omegaDesired1 thetaCurrent2 thetaDesired2 omegaCurrent2 omegaDesired2\n";
 
     //  Setup Maxon Motor Objects
     CMaxonMotor motor;
     motor.CloseAllDevice();
     motor.ActiviateAllDevice();
     motor.SetCurrentModeAll();
-    double* minJerk_theta_omega;
-
-    int thetaCurrent[3];
-    int omegaCurrent[3];
-    int thetaDesired[3];
-    thetaDesired[0] = 17; //minjerk(time);
-    thetaDesired[1] = -21;
-    thetaDesired[2] = 0;
-
-    int omegaDesired[3];
-    omegaDesired[0] = 0; //minjerk(time);            
-    omegaDesired[1] = 0;
-    omegaDesired[2] = 0;
-    
-    short currentCurrent[3];
-
-    double* torqueDesired;
-   
-    short currentDesired[3];
-    currentDesired[0]=0;
-    currentDesired[1]=0;
-    currentDesired[2]=0;
     motor.SetCurrentAll(currentDesired);
+
+    //Populate delayed queue
+    motor.GetCurrentVelAllDevice(omegaCurrent);
+    for(int i = 0; i < omegaDelayNum; i++){
+        qOmegaDelayed0.push(omegaCurrent[0]);
+        qOmegaDelayed1.push(omegaCurrent[1]);
+    }
+            
+    motor.GetCurrentPositionAllDevice(thetaCurrent);
+    for(int i = 0; i < thetaDelayNum; i++){
+        qThetaDelayed0.push(thetaCurrent[0]);
+        qThetaDelayed1.push(thetaCurrent[1]);
+    }
 
     //  Record start time
     std::chrono::time_point<std::chrono::high_resolution_clock>
@@ -269,34 +290,48 @@ int main(int argc, char *argv[])
 
             over = elapsed.count()-(CTRLPERIOD);
             if( over > LATEPERIOD){
-                cout<<"SLOW! Loop took "<< over << " seconds" << endl;
+                cout<<"SLOW! Loop took "<< over << " seconds over" << endl;
             }
             //  For timing
             startT = std::chrono::high_resolution_clock::now();
             
             // Update Desired
-            minJerk_theta_omega = minJerkTrajectory(elapsed.count(), movement_duration);
-            // thetaDesired[0] = minJerk_theta_omega[0];; //minjerk(time);
-            // thetaDesired[1] = minJerk_theta_omega[1]; 
+
+            minJerk_theta_omega = minJerkTrajectory(totalElapsed.count(), movement_duration);
+            // thetaDesired[0] = minJerk_theta_omega[0]; //minjerk(time);
+            // thetaDesired[1] = minJerk_theta_omega[1];
             // thetaDesired[2] = 0;
             // omegaDesired[0] = minJerk_theta_omega[2]; //minjerk(time);            
             // omegaDesired[1] = minJerk_theta_omega[3];
             // omegaDesired[2] = 0;
 
+            // Sensing and time delay
+            omegaDelayed[0] = qOmegaDelayed0.front();
+            qOmegaDelayed0.pop();
+            omegaDelayed[1] = qOmegaDelayed1.front();
+            qOmegaDelayed1.pop();
+            thetaDelayed[0] = qThetaDelayed0.front();
+            qThetaDelayed0.pop();
+            thetaDelayed[1] = qThetaDelayed1.front();
+            qThetaDelayed1.pop();
 
-            // Sensing
             motor.GetCurrentVelAllDevice(omegaCurrent);
+            qOmegaDelayed0.push(omegaCurrent[0]);
+            qOmegaDelayed1.push(omegaCurrent[1]);
             motor.GetCurrentPositionAllDevice(thetaCurrent);
+            qThetaDelayed0.push(thetaCurrent[0]);
+            qThetaDelayed1.push(thetaCurrent[1]);
             motor.GetCurrentAll(currentCurrent);
-            cout << thetaCurrent[0] << " " << thetaCurrent[1] << endl;
+            cout << (360*thetaCurrent[0]/(2*PI)) << " " << (360*thetaCurrent[1]/(2*PI)) << endl;
+            cout << (360*omegaCurrent[0]/(2*PI)) << " " << (360*omegaCurrent[1]/(2*PI)) << endl;
 
             //  Control
             //torqueDesired = randomTest();
-            torqueDesired = EPModel(thetaCurrent, omegaCurrent, thetaDesired, omegaDesired);
+            torqueDesired = EPModel(thetaCurrent, omegaCurrent, thetaDesired, omegaDesired, omegaDelayed, thetaDelayed);
 
-            currentDesired[0] = KV0*torqueDesired[0];
-            currentDesired[1] = KV1*torqueDesired[1];
-            currentDesired[2] = KV2*torqueDesired[2];
+            currentDesired[0] = KV0*torqueDesired[0]/2;
+            currentDesired[1] = KV1*torqueDesired[1]/2;
+            currentDesired[2] = KV2*torqueDesired[2]/2;
             motor.SetCurrentAll(currentDesired);
 
             //  Logging 

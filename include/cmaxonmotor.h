@@ -38,8 +38,8 @@ public:
     void CloseAllDevice();
     void ActiviateAllDevice();
     void DisableAllDevice();
-    void GetCurrentVelAllDevice(int* CurrentVel);
-    void GetCurrentPositionAllDevice(int* CurrentPosition);
+    void GetCurrentVelAllDevice(double* CurrentVel);
+    void GetCurrentPositionAllDevice(double* CurrentPosition);
     void SetCurrentAll(short* targetCurrent);
     void GetCurrentAll(short* currentAll);
     void SetCurrentModeAll();
