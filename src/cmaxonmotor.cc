@@ -8,8 +8,8 @@ using namespace std;
 
 CMaxonMotor::CMaxonMotor()
 {
-    PortName_M1 = "USB2";
-    PortName_M2 = "USB1";
+    PortName_M1 = (char*)"USB2";
+    PortName_M2 = (char*)"USB1";
     //PortName_M3 = "USB0";
 
     nodeId_M1 = 1;

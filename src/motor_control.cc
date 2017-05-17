@@ -25,6 +25,8 @@ double KPOS[3];
 double KVEL[3];
 double STARTPOINT[2];
 double ENDPOINT[2];
+double L1;
+double L2;
 
 
 using namespace std;
@@ -98,28 +100,54 @@ double* EPModel(int* thetaDesired, int* omegaDesired, int* thetaCurrent, int* om
     return torqueDesired;
 }
 
+double* anglesToHandPos(double th1, double th2){
+    static double handPos[2];
+    handPos[0] = cos(th1)*L1+cos(th1+th2)*L2;
+    handPos[1] = sin(th1)*L1+sin(th1+th2)*L2;
+    return handPos;
+}
+
+double* handPosToAngles(double x, double y){
+    static double thetas[2];
+    double alphas[3];
+    alphas[0]= atan(y/x);
+    alphas[1] = acos((pow(x, 2)+ pow(y, 2)+pow(L1, 2)-pow(L2, 2))/(2*L1*sqrt(pow(x, 2)+pow(y, 2))));
+    alphas[2] = acos((pow(x, 2)+ pow(y, 2)+pow(L2, 2)-pow(L1, 2))/(2*L2*sqrt(pow(x, 2)+pow(y, 2))));
+    thetas[0] = alphas[0]-alphas[1];
+    thetas[1] = alphas[1]+alphas[2];
+    return thetas;
+}
+
 
 double* minJerkTrajectory(double time, double duration){
     
-    static double minimumjerktrajectory_theta_omega[4];
+    static double minimumJerkTrajectory_theta_omega[4]; // th1 th2 position, th1 th2 velocity
+    double minimumJerkTrajectory_x_v[4]; //x, y position, x, y velocity 
     
     if(time> duration){
-        double* endPos = minJerkTrajectory(duration, duration); //end of movement position and velocity
-        minimumjerktrajectory_theta_omega[0]= endPos[0]; 
-        minimumjerktrajectory_theta_omega[1]= endPos[1]; 
+        double* endPos_theta_omega = minJerkTrajectory(duration, duration); //end of movement position and velocity   
+        minimumJerkTrajectory_theta_omega[0]= endPos_theta_omega[0]; 
+        minimumJerkTrajectory_theta_omega[1]= endPos_theta_omega[1]; 
 
-        minimumjerktrajectory_theta_omega[2]=  0;
-        minimumjerktrajectory_theta_omega[3]=  0;
+        minimumJerkTrajectory_theta_omega[2]=  0;
+        minimumJerkTrajectory_theta_omega[3]=  0;
     }
     else {
-        minimumjerktrajectory_theta_omega[0]= STARTPOINT[0] + (ENDPOINT[0]-STARTPOINT[0])*(10*pow((time/duration), 3) - 15*pow((time/duration), 4) + 6*pow((time/duration),5)); 
-        minimumjerktrajectory_theta_omega[1]= STARTPOINT[1] + (ENDPOINT[1]-STARTPOINT[1])*(10*pow((time/duration), 3) - 15*pow((time/duration), 4) + 6*pow((time/duration),5)); 
+        minimumJerkTrajectory_x_v[0]= STARTPOINT[0] + (ENDPOINT[0]-STARTPOINT[0])*(10*pow((time/duration), 3) - 15*pow((time/duration), 4) + 6*pow((time/duration),5)); 
+        minimumJerkTrajectory_x_v[1]= STARTPOINT[1] + (ENDPOINT[1]-STARTPOINT[1])*(10*pow((time/duration), 3) - 15*pow((time/duration), 4) + 6*pow((time/duration),5)); 
 
-        minimumjerktrajectory_theta_omega[2]=  (ENDPOINT[0]-STARTPOINT[0])*(1/duration)*(30*pow((time/duration), 2) - 60*pow((time/duration), 3) + 30*pow((time/duration), 4)); 
-        minimumjerktrajectory_theta_omega[3]=  (ENDPOINT[1]-STARTPOINT[1])*(1/duration)*(30*pow((time/duration), 2) - 60*pow((time/duration), 3) + 30*pow((time/duration), 4)); 
-
+        minimumJerkTrajectory_x_v[2]=  (ENDPOINT[0]-STARTPOINT[0])*(1/duration)*(30*pow((time/duration), 2) - 60*pow((time/duration), 3) + 30*pow((time/duration), 4)); 
+        minimumJerkTrajectory_x_v[3]=  (ENDPOINT[1]-STARTPOINT[1])*(1/duration)*(30*pow((time/duration), 2) - 60*pow((time/duration), 3) + 30*pow((time/duration), 4)); 
+        double* endPos;
+        endPos = handPosToAngles(minimumJerkTrajectory_x_v[0], minimumJerkTrajectory_x_v[1]);
+        minimumJerkTrajectory_theta_omega[0]= endPos[0]; 
+        minimumJerkTrajectory_theta_omega[1]= endPos[1]; 
+        double* endVel;
+        endVel = handPosToAngles(minimumJerkTrajectory_x_v[2], minimumJerkTrajectory_x_v[3]);
+        minimumJerkTrajectory_theta_omega[2]=  endVel[0]; 
+        minimumJerkTrajectory_theta_omega[3]=  endVel[0];
     }
-    return minimumjerktrajectory_theta_omega;
+    return minimumJerkTrajectory_theta_omega;
 }
 
 
@@ -156,23 +184,32 @@ int main(int argc, char *argv[])
     double target_x[4] = {0, 0, -0.140, 0.325};
     double target_y[4] = {0.273, 0.584, 0.522, 0.273};
     //arm lengths in meters
-    double l1 = 0.279;
-    double l2 = 0.257;
+    L1 = 0.279;
+    L2 = 0.257;
     int start = 0;         //index of start target, 0 - 3
     int end = 1;           //index of end target, 0 -3
     double movement_duration = 5;      //duration in seconds
 
-    double alpha1_start = atan(target_y[start]/target_x[start]);
-    double alpha2_start = acos((pow(target_x[start], 2)+ pow(target_y[start], 2)+pow(l1, 2)-pow(l2, 2))/(2*l1*sqrt(pow(target_x[start], 2)+pow(target_y[start], 2))));
-    double alpha3_start = acos((pow(target_x[start], 2)+ pow(target_y[start], 2)+pow(l2, 2)-pow(l1, 2))/(2*l2*sqrt(pow(target_x[start], 2)+pow(target_y[start], 2))));
-    double alpha1_end = atan(target_y[end]/target_x[end]);
-    double alpha2_end = acos((pow(target_x[end], 2)+ pow(target_y[end], 2)+pow(l1, 2)-pow(l2, 2))/(2*l1*sqrt(pow(target_x[end], 2)+pow(target_y[end], 2))));
-    double alpha3_end = acos((pow(target_x[end], 2)+ pow(target_y[end], 2)+pow(l2, 2)-pow(l1, 2))/(2*l2*sqrt(pow(target_x[end], 2)+pow(target_y[end], 2))));
+    double* theta_start;
+    theta_start = handPosToAngles(target_x[start], target_y[start]);
+    double* theta_end;
+    theta_end = handPosToAngles(target_x[end], target_y[end]);
+    STARTPOINT[0]=target_x[start]; //x and y of start target
+    STARTPOINT[1]=target_y[start];
+    ENDPOINT[0]= target_x[end]; //x and y of end target
+    ENDPOINT[1]= target_y[end];
 
-    STARTPOINT[0]=alpha1_start - alpha2_start; //theta1 and theta2 of start target
-    STARTPOINT[1]=alpha1_start+alpha3_start;
-    ENDPOINT[0]=alpha1_end - alpha2_end; //theta1 and theta2 of end target
-    ENDPOINT[1]= alpha1_end + alpha3_end;
+    //double alpha1_start = atan(target_y[start]/target_x[start]);
+    //double alpha2_start = acos((pow(target_x[start], 2)+ pow(target_y[start], 2)+pow(l1, 2)-pow(l2, 2))/(2*l1*sqrt(pow(target_x[start], 2)+pow(target_y[start], 2))));
+    //double alpha3_start = acos((pow(target_x[start], 2)+ pow(target_y[start], 2)+pow(l2, 2)-pow(l1, 2))/(2*l2*sqrt(pow(target_x[start], 2)+pow(target_y[start], 2))));
+    //double alpha1_end = atan(target_y[end]/target_x[end]);
+    //double alpha2_end = acos((pow(target_x[end], 2)+ pow(target_y[end], 2)+pow(l1, 2)-pow(l2, 2))/(2*l1*sqrt(pow(target_x[end], 2)+pow(target_y[end], 2))));
+    //double alpha3_end = acos((pow(target_x[end], 2)+ pow(target_y[end], 2)+pow(l2, 2)-pow(l1, 2))/(2*l2*sqrt(pow(target_x[end], 2)+pow(target_y[end], 2))));
+
+    //STARTPOINT[0]=alpha1_start - alpha2_start; //theta1 and theta2 of start target
+    //STARTPOINT[1]=alpha1_start+alpha3_start;
+    //ENDPOINT[0]=alpha1_end - alpha2_end; //theta1 and theta2 of end target
+    //ENDPOINT[1]= alpha1_end + alpha3_end;
     sleep(1);
     cout << "Press <Enter> to begin..." << endl;
     getchar();
@@ -239,12 +276,12 @@ int main(int argc, char *argv[])
             
             // Update Desired
             minJerk_theta_omega = minJerkTrajectory(elapsed.count(), movement_duration);
-            thetaDesired[0] = minJerk_theta_omega[0];; //minjerk(time);
-            thetaDesired[1] = minJerk_theta_omega[1];
-            thetaDesired[2] = 0;
-            omegaDesired[0] = minJerk_theta_omega[2]; //minjerk(time);            
-            omegaDesired[1] = minJerk_theta_omega[3];
-            omegaDesired[2] = 0;
+            // thetaDesired[0] = minJerk_theta_omega[0];; //minjerk(time);
+            // thetaDesired[1] = minJerk_theta_omega[1]; 
+            // thetaDesired[2] = 0;
+            // omegaDesired[0] = minJerk_theta_omega[2]; //minjerk(time);            
+            // omegaDesired[1] = minJerk_theta_omega[3];
+            // omegaDesired[2] = 0;
 
 
             // Sensing
