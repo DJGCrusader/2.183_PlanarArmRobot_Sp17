@@ -11,7 +11,7 @@ using namespace std;
 
 CMaxonMotor::CMaxonMotor()
 {
-    PortName_M1 = (char *)"USB0";
+    PortName_M1 = (char *)"USB2";
     PortName_M2 = (char *)"USB1";
     //PortName_M3 = "USB0";
 
@@ -267,7 +267,7 @@ void* CMaxonMotor::activate_device(char *PortName, unsigned short nodeId)
     char ProtocolStackName[] = "MAXON SERIAL V2";
     char InterfaceName[] = "USB";
     unsigned int ErrorCode = 0x00;
-    unsigned long timeout_ = 50;
+    unsigned long timeout_ = 10;
     unsigned long baudrate_ = 1000000; //1000000;
     void *keyHandle_;
 
@@ -379,22 +379,18 @@ void CMaxonMotor::GetCurrentPositionAllDevice(double* CurrentPosition){
     // CurrentPosition[2]=Pos;
 }
 
-void CMaxonMotor::SetCurrentAll(short* targetCurrent){
+void CMaxonMotor::SetCurrentAll(long* targetCurrent){
 
     int lResult = 0;
     unsigned int ErrorCode = 0;
-    if (targetCurrent[0] > 4500) targetCurrent[0] = 4500;
-    if (targetCurrent[0] < -4500) targetCurrent[0] = -4500;
-    if (targetCurrent[1] > 4500) targetCurrent[0] = 4500;
-    if (targetCurrent[1] < -4500) targetCurrent[0] = -4500;
 
     //cout<< targetCurrent << endl;
-    if(VCS_SetCurrentMust(keyHandle_M1, nodeId_M1,targetCurrent[0], &ErrorCode) == 0)
+    if(VCS_SetCurrentMust(keyHandle_M1, nodeId_M1,(short)targetCurrent[0], &ErrorCode) == 0)
     {
         lResult = 1;
         cerr << "VCS_SetCurrentMust Failed M1: "<< targetCurrent[0] << " " << ErrorCode << endl;
     }
-    if(VCS_SetCurrentMust(keyHandle_M2, nodeId_M2,targetCurrent[1], &ErrorCode) == 0)
+    if(VCS_SetCurrentMust(keyHandle_M2, nodeId_M2,(short)targetCurrent[1], &ErrorCode) == 0)
     {
         lResult = 1;
         cerr << "VCS_SetCurrentMust Failed M2: "<< targetCurrent[0] << endl;

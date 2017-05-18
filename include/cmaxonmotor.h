@@ -40,7 +40,7 @@ public:
     void DisableAllDevice();
     void GetCurrentVelAllDevice(double* CurrentVel);
     void GetCurrentPositionAllDevice(double* CurrentPosition);
-    void SetCurrentAll(short* targetCurrent);
+    void SetCurrentAll(long* targetCurrent);
     void GetCurrentAll(short* currentAll);
     void SetCurrentModeAll();
 
