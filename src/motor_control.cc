@@ -110,17 +110,17 @@ double* anglesToHandPos(double th1, double th2){
 double* handPosToAngles(double x, double y){
     static double thetas[2];
     double alphas[3];
-    alphas[0]= atan(y/x);
+    alphas[0]= atan2(y,x);
     alphas[1] = acos((pow(x, 2)+ pow(y, 2)+pow(L1, 2)-pow(L2, 2))/(2*L1*sqrt(pow(x, 2)+pow(y, 2))));
     alphas[2] = acos((pow(x, 2)+ pow(y, 2)+pow(L2, 2)-pow(L1, 2))/(2*L2*sqrt(pow(x, 2)+pow(y, 2))));
     thetas[0] = alphas[0]-alphas[1];
     thetas[1] = alphas[1]+alphas[2];
-    if(thetas[0]< 0 ){
-        thetas[0] = thetas[0]+PI;
-    }
-    if(thetas[1]< 0 ){
-        thetas[1] = thetas[1]+PI;
-    }
+    // if(thetas[0]< 0 ){
+    //     thetas[0] = thetas[0]+PI;
+    // }
+    // if(thetas[1]< 0 ){
+    //     thetas[1] = thetas[1]+PI;
+    // }
     return thetas;
 }
 //return angular velocities from hand velocities
@@ -202,6 +202,7 @@ int main(int argc, char *argv[])
     theta_start = handPosToAngles(target_x[start], target_y[start]);
     double* theta_end;
     theta_end = handPosToAngles(target_x[end], target_y[end]);
+    
     STARTPOINT[0]=target_x[start]; //x and y of start target
     STARTPOINT[1]=target_y[start];
     ENDPOINT[0]= target_x[end]; //x and y of end target
@@ -398,9 +399,9 @@ int main(int argc, char *argv[])
                 // cout << "th1tst " << endThTest[0] << endl;
                 // cout << "th2tst " << endThTest[1] << endl;
                 // cout << "x " << endPos[0] << endl;
-                // cout << "y " << endPos[1] << endl;
-                cout << "actual / desired theta1 " << thetaCurrent[0] << " / " << thetaDesired[0] << endl;
-                cout << "actual /  desired theta2 " << thetaCurrent[1] << " / " << thetaDesired[1] << endl; 
+                // // cout << "y " << endPos[1] << endl;
+                // cout << "actual / desired theta1 " << thetaCurrent[0] << " / " << thetaDesired[0] << endl;
+                // cout << "actual /  desired theta2 " << thetaCurrent[1] << " / " << thetaDesired[1] << endl; 
                 // cout << "actual / desired theta1dot " << omegaCurrent[0] << " / " << omegaDesired[0] << endl;
                 // cout << "actual / desired theta2dot " << omegaCurrent[1] << " / " << omegaDesired[1] << endl;  
                 // cout << (360*thetaCurrent[0]/(2*PI)) << " " << (360*thetaCurrent[1]/(2*PI)) << endl;
